@@ -25,6 +25,29 @@ Output:
 - ringkasan + daftar artikel berwarna di konsol
 - `reports/<keyword>-<timestamp>.json` — data lengkap
 - `reports/<keyword>-<timestamp>.html` — laporan mandiri (statistik + tabel artikel)
+- `reports/<keyword>-<timestamp>-peta.html` — peta sentimen per lokasi (folium/Leaflet)
+- semua laporan & artikel tersimpan di **PostgreSQL** (`news_sentiment`, lihat `db.py`)
+
+## Web UI
+
+```bash
+./venv/bin/python app.py   # http://localhost:8003
+```
+
+Halaman web: analisis per keyword, statistik + bar distribusi, peta sentimen
+interaktif, tabel artikel dengan lokasi, dan riwayat laporan (dari database).
+
+## Monitoring otomatis (cron/Telegram)
+
+`run_sentimen.py` membaca keyword dari `keywords.txt`, menjalankan analisis,
+dan mencetak ringkasan siap-Telegram (dipakai oleh cron job Hermes harian).
+
+## Anti-duplikat
+
+- `articles.url` UNIQUE global: artikel yang sama tidak pernah tersimpan dua kali
+- `reports` UNIQUE(keyword, scraped_at): tidak ada report ganda
+- `report_articles` PK(report_id, article_id): link laporan-artikel unik
+- migrasi otomatis dari skema lama saat `init_db()`
 
 ## Cara kerja
 

@@ -28,6 +28,10 @@ from pathlib import Path
 import feedparser
 import requests
 
+import db as db_mod
+import peta as peta_mod
+from gazetteer import extract_locations
+
 GNEWS_RSS = "https://news.google.com/rss/search"
 
 MODEL_NAME = "cardiffnlp/twitter-xlm-roberta-base-sentiment"
@@ -61,6 +65,9 @@ class Article:
     snippet: str = ""
     sentiment: str = ""          # positif / netral / negatif
     confidence: float = 0.0
+    lokasi: str = ""             # lokasi utama yang terdeteksi
+    lat: float | None = None
+    lon: float | None = None
     key: str = field(default="")
 
 
@@ -152,6 +159,9 @@ def build_report(articles: list[Article], keyword: str, elapsed: float) -> dict:
                 "url": a.link,
                 "sentimen": a.sentiment,
                 "confidence": round(a.confidence, 4),
+                "lokasi": a.lokasi,
+                "lat": a.lat,
+                "lon": a.lon,
             }
             for a in articles
         ],
@@ -288,6 +298,11 @@ def main() -> int:
     analyzer = SentimentAnalyzer()
     for a in articles:
         a.sentiment, a.confidence = analyzer.predict(a)
+        locs = extract_locations(f"{a.title} {a.snippet}")
+        if locs:
+            a.lokasi = locs[0]["nama"]
+            a.lat = locs[0]["lat"]
+            a.lon = locs[0]["lon"]
 
     report = build_report(articles, args.keyword, time.time() - t0)
     print_console(report)
@@ -298,10 +313,29 @@ def main() -> int:
     slug = re.sub(r"[^a-z0-9]+", "-", args.keyword.lower()).strip("-")[:40] or "berita"
     json_path = out_dir / f"{slug}-{stamp}.json"
     html_path = out_dir / f"{slug}-{stamp}.html"
+    map_path = out_dir / f"{slug}-{stamp}-peta.html"
     json_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     render_html(report, html_path)
+    peta_mod.generate(report, map_path)
+    report["saved"] = json_path.name
+    report["map_file"] = map_path.name
+
+    # Simpan ke database PostgreSQL
+    try:
+        db_mod.init_db()
+        artikel_db = [{
+            "judul": a.title, "sumber": a.source, "tanggal": a.published,
+            "url": a.link, "snippet": a.snippet, "sentimen": a.sentiment,
+            "confidence": a.confidence, "lokasi": a.lokasi, "lat": a.lat, "lon": a.lon,
+        } for a in articles]
+        db_mod.save_report(report, artikel_db)
+        print("Database: laporan tersimpan (PostgreSQL).")
+    except Exception as e:
+        print(f"Database: gagal menyimpan ({e}).", file=sys.stderr)
+
     print(f"Laporan tersimpan: {json_path}")
     print(f"                  {html_path}")
+    print(f"Peta sentimen:     {map_path}")
     return 0
 
 

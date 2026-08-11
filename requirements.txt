@@ -5,3 +5,6 @@ protobuf>=4.25
 tiktoken>=0.7
 feedparser>=6.0
 requests>=2.31
+flask>=3.0
+folium>=0.16
+psycopg2-binary>=2.9

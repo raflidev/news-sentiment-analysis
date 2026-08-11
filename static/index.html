@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>News Sentiment Analysis | Sentimen Berita Indonesia</title>
+<style>
+  /* Font self-hosted (tanpa Google Fonts) */
+  @font-face {
+    font-family: "Source Serif 4 Variable";
+    src: url("/static/fonts/source-serif-4.woff2") format("woff2");
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Source Sans 3 Variable";
+    src: url("/static/fonts/source-sans-3.woff2") format("woff2");
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "JetBrains Mono";
+    src: url("/static/fonts/jetbrains-mono.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  :root {
+    --ink: #24313d;
+    --ink-dim: #55636f;
+    --ink-faint: #8a97a3;
+    --bg: #fbfaf7;
+    --surface: #ffffff;
+    --surface-2: #f3f1eb;
+    --hairline: #e4e0d6;
+    --accent: #175e7d;
+    --accent-deep: #11495f;
+    --accent-tint: #eaf3f7;
+    --neg: #cf222e;
+    --net: #9a6700;
+    --pos: #1a7f37;
+    --sans: "Source Sans 3 Variable", system-ui, sans-serif;
+    --serif: "Source Serif 4 Variable", Georgia, serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: rgba(23, 94, 125, 0.16); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: inherit; }
+  button { font-family: inherit; }
+
+  /* Nav */
+  nav {
+    position: fixed; inset: 0 0 auto 0; z-index: 50;
+    border-bottom: 1px solid var(--hairline);
+    background: rgba(251, 250, 247, 0.95);
+  }
+  nav .inner {
+    max-width: 1080px; margin: 0 auto; height: 60px;
+    display: flex; align-items: center; justify-content: space-between; padding: 0 20px;
+  }
+  .wordmark { font-family: var(--serif); font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
+  .wordmark .dot { color: var(--accent); }
+  nav a.link { font-size: 13px; font-weight: 600; color: var(--ink-dim); text-decoration: none; }
+  nav a.link:hover { color: var(--accent); }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 96px 20px 80px; }
+
+  /* Header */
+  header { max-width: 640px; }
+  .kicker {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--accent); margin: 0 0 14px;
+  }
+  h1 {
+    font-family: var(--serif); font-size: 38px; font-weight: 600;
+    line-height: 1.12; margin: 0 0 14px; letter-spacing: -0.01em;
+  }
+  .sub { color: var(--ink-dim); font-size: 17px; margin: 0 0 26px; max-width: 56ch; }
+
+  /* Form */
+  form.analyze {
+    display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 6px;
+  }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 12px; font-weight: 600; color: var(--ink-dim); }
+  input[type="text"], select {
+    height: 42px; border: 1px solid var(--hairline); background: var(--surface);
+    font-family: inherit; font-size: 14px; color: var(--ink);
+    padding: 0 12px; border-radius: 6px;
+  }
+  input[type="text"] { width: 300px; }
+  input[type="text"]::placeholder { color: var(--ink-faint); }
+  select { width: 88px; }
+  .btn {
+    height: 42px; align-self: flex-end;
+    border: none; border-radius: 6px; background: var(--accent); color: #fff;
+    font-size: 14px; font-weight: 600; padding: 0 22px; cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn:hover { background: var(--accent-deep); }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+  .form-hint { font-size: 12px; color: var(--ink-faint); margin: 0 0 24px; }
+
+  /* Status model */
+  .status {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 12px; color: var(--ink-dim);
+    border: 1px solid var(--hairline); background: var(--surface);
+    padding: 5px 14px; border-radius: 999px; margin-bottom: 28px;
+  }
+  .status .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-faint); }
+  .status.ready { color: var(--accent-deep); border-color: rgba(23, 94, 125, 0.35); background: var(--accent-tint); }
+  .status.ready .dot { background: var(--accent); }
+  .status.error { color: var(--neg); border-color: rgba(207, 34, 46, 0.35); background: #fbefef; }
+  .status.error .dot { background: var(--neg); }
+
+  /* Error */
+  .error {
+    display: none; margin-bottom: 24px; padding: 12px 16px;
+    border: 1px solid rgba(207, 34, 46, 0.35); background: #fbefef;
+    color: #9b1c1c; font-size: 14px;
+  }
+  .error.show { display: block; }
+
+  /* Panel */
+  .panel { border: 1px solid var(--hairline); background: var(--surface); margin-bottom: 24px; }
+  .panel .phead {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    border-bottom: 1px solid var(--hairline); padding: 12px 20px;
+  }
+  .panel .phead h2 {
+    font-family: var(--serif); font-size: 17px; font-weight: 600; margin: 0;
+  }
+  .panel .phead .meta { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); }
+  .panel .pbody { padding: 20px; }
+
+  /* Stats */
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); margin-bottom: 22px; }
+  .stat { background: var(--surface); padding: 18px 20px; }
+  .stat .num { font-family: var(--serif); font-size: 34px; font-weight: 700; line-height: 1; }
+  .stat .lbl { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-dim); margin-top: 6px; }
+  .stat .pct { display: block; font-family: var(--mono); font-size: 12px; color: var(--ink-faint); margin-top: 2px; }
+
+  /* Bars */
+  .bar-row { display: grid; grid-template-columns: 96px 1fr 120px; align-items: center; gap: 14px; margin-bottom: 12px; }
+  .bar-row:last-child { margin-bottom: 0; }
+  .bar-row .lbl { font-size: 13px; font-weight: 600; }
+  .bar-row .track { height: 10px; background: var(--surface-2); }
+  .bar-row .fill { height: 100%; transition: width 0.6s ease; }
+  .bar-row .pct { font-family: var(--mono); font-size: 12px; color: var(--ink-dim); text-align: right; }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  thead th {
+    text-align: left; font-family: var(--mono); font-size: 10.5px; font-weight: 400;
+    text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-faint);
+    padding: 8px 12px; border-bottom: 1px solid var(--hairline);
+  }
+  tbody td { padding: 11px 12px; border-bottom: 1px solid var(--hairline); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: rgba(23, 94, 125, 0.03); }
+  td.num { font-family: var(--mono); font-size: 12px; color: var(--ink-faint); width: 34px; }
+  td a.title { color: var(--ink); text-decoration: none; font-weight: 500; }
+  td a.title:hover { color: var(--accent); text-decoration: underline; }
+  .src { font-size: 12px; color: var(--ink-faint); margin-top: 1px; }
+  .src .loc {
+    display: inline-block; margin-right: 4px; padding: 0 7px;
+    font-size: 11px; font-weight: 600; color: var(--accent-deep);
+    border: 1px solid rgba(23, 94, 125, 0.35); background: var(--accent-tint);
+    border-radius: 4px;
+  }
+  .chip {
+    display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+    padding: 2px 10px; border-radius: 4px; white-space: nowrap;
+  }
+  .conf { font-family: var(--mono); font-size: 12px; color: var(--ink-dim); white-space: nowrap; }
+
+  /* History */
+  .hist-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 11px 4px; border-bottom: 1px solid var(--hairline); cursor: pointer;
+  }
+  .hist-item:last-child { border-bottom: none; }
+  .hist-item:hover .k { color: var(--accent); }
+  .hist-item .k { font-weight: 600; font-size: 14px; }
+  .hist-item .d { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); margin-top: 1px; }
+  .hist-item .mini { display: flex; gap: 10px; font-family: var(--mono); font-size: 11px; }
+  .hist-item .mini span { white-space: nowrap; }
+
+  .empty { padding: 26px; text-align: center; color: var(--ink-faint); font-size: 14px; }
+  .skeleton { height: 14px; background: var(--surface-2); margin-bottom: 10px; }
+
+  .foot { margin-top: 34px; border-top: 1px solid var(--hairline); padding-top: 18px;
+          color: var(--ink-faint); font-size: 12.5px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .foot code { font-family: var(--mono); font-size: 11.5px; }
+
+  @media (max-width: 640px) {
+    .stats { grid-template-columns: 1fr; }
+    .bar-row { grid-template-columns: 80px 1fr 84px; }
+    input[type="text"] { width: 100%; }
+    h1 { font-size: 30px; }
+  }
+</style>
+</head>
+<body>
+<nav>
+  <div class="inner">
+    <span class="wordmark">News Sentiment<span class="dot">.</span></span>
+    <a class="link" href="#laporan">Laporan</a>
+  </div>
+</nav>
+
+<div class="wrap">
+  <header>
+    <p class="kicker">News Sentiment Analysis</p>
+    <h1>Sentimen Berita Indonesia</h1>
+    <p class="sub">Analisis sentimen berita per keyword dengan model NLP. Klasifikasi positif, netral, dan negatif dari judul berita.</p>
+
+    <form class="analyze" id="form">
+      <div class="field">
+        <label for="kw">Keyword berita</label>
+        <input type="text" id="kw" name="kw" placeholder="contoh: inflasi" autocomplete="off" required />
+      </div>
+      <div class="field">
+        <label for="limit">Jumlah</label>
+        <select id="limit" name="limit">
+          <option value="20">20</option>
+          <option value="40" selected>40</option>
+          <option value="60">60</option>
+          <option value="100">100</option>
+        </select>
+      </div>
+      <button class="btn" type="submit" id="btn">Analisis</button>
+    </form>
+    <p class="form-hint">Berita diambil dari Google News Indonesia. Proses membutuhkan beberapa detik.</p>
+  </header>
+
+  <div class="status" id="status"><span class="dot"></span><span id="statusText">Memeriksa model...</span></div>
+  <div class="error" id="error"></div>
+
+  <!-- Hasil -->
+  <div class="panel" id="resultPanel" style="display:none">
+    <div class="phead">
+      <h2 id="resultTitle">Hasil</h2>
+      <span class="meta" id="resultMeta"></span>
+    </div>
+    <div class="pbody">
+      <div class="stats" id="stats"></div>
+      <div class="panel" style="margin-bottom:0">
+        <div class="pbody" id="bars" style="padding-top:0"></div>
+      </div>
+      <div id="mapWrap" style="display:none;margin-top:24px">
+        <h2 style="font-family:var(--serif);font-size:16px;font-weight:600;margin:0 0 10px">Peta sentimen per lokasi</h2>
+        <iframe id="mapFrame" src="" width="100%" height="480" style="border:1px solid var(--hairline)" loading="lazy" title="Peta sentimen"></iframe>
+      </div>
+      <h2 style="font-family:var(--serif);font-size:16px;font-weight:600;margin:26px 0 10px">Artikel</h2>
+      <table>
+        <thead><tr><th></th><th>Judul</th><th>Sentimen</th><th>Keyakinan</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Riwayat laporan -->
+  <div class="panel" id="laporan">
+    <div class="phead">
+      <h2>Laporan tersimpan</h2>
+      <span class="meta">klik untuk memuat</span>
+    </div>
+    <div class="pbody" id="history" style="padding:6px 20px">
+      <div class="empty">Memuat daftar laporan...</div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span>Model: <code>cardiffnlp/twitter-xlm-roberta-base-sentiment</code> · berjalan lokal</span>
+    <span>Hasil bersifat indikatif, bukan penilaian editorial.</span>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+const $ = (id) => document.getElementById(id);
+const SENT = {
+  negatif: { label: "Negatif", color: "#cf222e" },
+  netral: { label: "Netral", color: "#9a6700" },
+  positif: { label: "Positif", color: "#1a7f37" },
+};
+const ORDER = ["negatif", "netral", "positif"];
+
+function setStatus(state, text) {
+  const el = $("status");
+  el.className = "status" + (state ? " " + state : "");
+  $("statusText").textContent = text;
+}
+function showError(msg) {
+  const el = $("error");
+  el.textContent = msg;
+  el.classList.add("show");
+}
+function hideError() { $("error").classList.remove("show"); }
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function renderReport(r) {
+  $("resultPanel").style.display = "";
+  $("resultTitle").textContent = 'Sentimen: "' + r.keyword + '"';
+  $("resultMeta").textContent = r.total_artikel + " artikel · " + (r.scraped_at || "").slice(0, 16).replace("T", " ") + " UTC";
+
+  $("stats").innerHTML = ORDER.map((s) => {
+    const d = r.ringkasan[s];
+    return '<div class="stat"><span class="num" style="color:' + SENT[s].color + '">' + d.jumlah +
+      '</span><span class="lbl">' + SENT[s].label + "</span>" +
+      '<span class="pct">' + (d.persen !== undefined ? d.persen : "") + "%</span></div>";
+  }).join("");
+
+  $("bars").innerHTML = ORDER.map((s) => {
+    const d = r.ringkasan[s];
+    const persen = d.persen !== undefined ? d.persen : (d.jumlah / Math.max(r.total_artikel, 1)) * 100;
+    return '<div class="bar-row"><span class="lbl" style="color:' + SENT[s].color + '">' + SENT[s].label +
+      '</span><div class="track"><div class="fill" style="width:' + persen + "%;background:" + SENT[s].color +
+      '"></div></div><span class="pct">' + persen.toFixed(0) + "% (" + d.jumlah + ")</span></div>";
+  }).join("");
+
+  // Peta sentimen per lokasi
+  const mapEl = $("mapWrap");
+  if (r.map_file) {
+    mapEl.style.display = "";
+    $("mapFrame").src = "/peta/" + encodeURIComponent(r.map_file);
+  } else {
+    mapEl.style.display = "none";
+  }
+
+  $("rows").innerHTML = r.artikel.map((a, i) => {
+    const c = SENT[a.sentimen] || SENT.netral;
+    const loc = a.lokasi ? '<span class="loc">' + esc(a.lokasi) + "</span> " : "";
+    return "<tr><td class='num'>" + (i + 1) + "</td>" +
+      "<td><a class='title' href='" + esc(a.url) + "' target='_blank' rel='noreferrer'>" + esc(a.judul) + "</a>" +
+      "<div class='src'>" + loc + esc(a.sumber) + " · " + esc(a.tanggal) + "</div></td>" +
+      "<td><span class='chip' style='color:" + c.color + ";border:1px solid " + c.color + "55;background:" + c.color + "18'>" + c.label + "</span></td>" +
+      "<td class='conf'>" + (a.confidence * 100).toFixed(0) + "%</td></tr>";
+  }).join("");
+}
+
+async function loadHistory() {
+  try {
+    const res = await fetch("/api/reports");
+    const items = await res.json();
+    const el = $("history");
+    if (!items.length) {
+      el.innerHTML = '<div class="empty">Belum ada laporan. Jalankan analisis pertama Anda.</div>';
+      return;
+    }
+    el.innerHTML = items.map((it) => {
+      const r = it.ringkasan || {};
+      const mini = ORDER.map((s) =>
+        '<span style="color:' + SENT[s].color + '">' + SENT[s].label + " " + (r[s] ? r[s].jumlah : 0) + "</span>").join("");
+      return "<div class='hist-item' data-id='" + it.id + "'>" +
+        "<div><div class='k'>\"" + esc(it.keyword) + "\"</div>" +
+        "<div class='d'>" + it.total + " artikel · " + (it.scraped_at || "").slice(0, 16).replace("T", " ") + " UTC</div></div>" +
+        "<div class='mini'>" + mini + "</div></div>";
+    }).join("");
+    el.querySelectorAll(".hist-item").forEach((node) => {
+      node.addEventListener("click", async () => {
+        const res = await fetch("/api/reports/" + encodeURIComponent(node.dataset.id));
+        if (res.ok) renderReport(await res.json());
+      });
+    });
+  } catch (e) {
+    $("history").innerHTML = '<div class="empty">Gagal memuat daftar laporan.</div>';
+  }
+}
+
+$("form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const kw = $("kw").value.trim();
+  if (!kw) return;
+  hideError();
+  const btn = $("btn");
+  btn.disabled = true;
+  btn.textContent = "Menganalisis...";
+  setStatus("", "Menganalisis \"" + kw + "\"...");
+  try {
+    const res = await fetch("/api/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ keyword: kw, limit: parseInt($("limit").value, 10) }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Gagal menganalisis.");
+    renderReport(data);
+    setStatus("ready", "Model siap · " + data.total_artikel + " artikel dianalisis");
+    loadHistory();
+  } catch (err) {
+    showError(err.message);
+    setStatus("error", "Analisis gagal");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Analisis";
+  }
+});
+
+// Cek status model (memuat model saat pertama kali)
+fetch("/api/status")
+  .then((r) => r.json())
+  .then((d) => {
+    if (d && d.status === "ready") setStatus("ready", "Model siap · transformer lokal");
+    else setStatus("error", "Gagal memuat model");
+  })
+  .catch(() => setStatus("error", "Server tidak merespons"));
+
+loadHistory();
+</script>
+</body>
+</html>
